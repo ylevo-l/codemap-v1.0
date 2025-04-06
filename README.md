@@ -4,7 +4,7 @@ This script was designed with one goal: maximizing workflow. It empowers users t
 
 ## Demo
 
-![CodeMap Demo](assets/codemap.gif)
+![CodeMap Demo](https://raw.githubusercontent.com/ylevo-l/codemap/refs/heads/main/assets/codemap.gif)
 
 ## Features
 
