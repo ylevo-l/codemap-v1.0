@@ -8,12 +8,11 @@ This script was designed with one goal: maximizing workflow. It empowers users t
 
 ## Features
 
-1. SHIFT-based subtree actions: expand/collapse, anonymize/de-anonymize.
-2. Single-folder toggles: expand/collapse, anonymize/de-anonymize.
-3. Single-file toggles: enable/disable to exclude files from clipboard copying.
-4. Clipboard copying of visible, enabled files with a progress bar.
-5. State persistence for expanded, anonymized, and file enablement.
-6. Selection arrow (`>`) beside the selected entry.
+1. Single-folder toggles: expand/collapse, anonymize/de-anonymize.
+2. Single-file toggles: enable/disable to exclude files from clipboard copying.
+3. Clipboard copying of visible, enabled files with a progress bar.
+4. State persistence for expanded, anonymized, and file enablement.
+5. Selection arrow (`>`) beside the selected entry.
 
 ## Usage
 
@@ -21,7 +20,6 @@ Navigate through your directory structure and perform actions using the followin
 
 - **[W]/[S]**: Navigate the tree
 - **[e]/[E]**: Expand/collapse a single folder or entire subtree
-- **[a]/[A]**: Anonymize/de-anonymize a single folder or entire subtree
 - **[d]**: Enable/disable a single file
 - **[c]**: Copy all visible, enabled files to the clipboard
 - **[q]**: Quit the application (saves state to `.tree_state.json`)
@@ -33,28 +31,5 @@ Navigate through your directory structure and perform actions using the followin
     ```bash
     git clone https://github.com/ylevo-l/codemap.git
     ```
-
-2. **Navigate to the directory**:
-
-    ```bash
-    cd codemap
-    ```
-
-3. **Install dependencies**:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-    
-4. **Setup CodeMap**:
-
-    ```bash
-    pip install -e .
-    ```
-    
-4. **Run CodeMap**:
-
-    ```bash
-    codemap
-    ```
+...
     
