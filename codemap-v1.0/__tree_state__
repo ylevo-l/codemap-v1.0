@@ -1,0 +1,140 @@
+{
+  ".": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "config": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "config\\__init__.py": {
+    "disabled": true
+  },
+  "config\\constants.py": {
+    "disabled": false
+  },
+  "config\\ui_labels.py": {
+    "disabled": false
+  },
+  "core": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "core\\__init__.py": {
+    "disabled": false
+  },
+  "core\\clipboard.py": {
+    "disabled": false
+  },
+  "core\\filesystem.py": {
+    "disabled": false
+  },
+  "core\\model.py": {
+    "disabled": false
+  },
+  "core\\operations.py": {
+    "disabled": false
+  },
+  "core\\state.py": {
+    "disabled": false
+  },
+  "ui": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\controls": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\controls\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\controls\\actions.py": {
+    "disabled": false
+  },
+  "ui\\controls\\events.py": {
+    "disabled": false
+  },
+  "ui\\controls\\keyboard.py": {
+    "disabled": false
+  },
+  "ui\\controls\\manager.py": {
+    "disabled": false
+  },
+  "ui\\handlers": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\handlers\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\handlers\\input_handler.py": {
+    "disabled": false
+  },
+  "ui\\input": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\input\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\input\\keyboard.py": {
+    "disabled": false
+  },
+  "ui\\rendering": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\rendering\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\rendering\\colors.py": {
+    "disabled": false
+  },
+  "ui\\rendering\\components.py": {
+    "disabled": false
+  },
+  "ui\\rendering\\renderer.py": {
+    "disabled": false
+  },
+  "ui\\rendering\\text.py": {
+    "disabled": false
+  },
+  "ui\\state": {
+    "expanded": true,
+    "anonymized": false,
+    "anonymized_name": null
+  },
+  "ui\\state\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\state\\ui_state.py": {
+    "disabled": false
+  },
+  "ui\\__init__.py": {
+    "disabled": false
+  },
+  "ui\\application.py": {
+    "disabled": false
+  },
+  "ui\\state.py": {
+    "disabled": false
+  },
+  "__init__.py": {
+    "disabled": false
+  },
+  "app.py": {
+    "disabled": false
+  },
+  "main.py": {
+    "disabled": false
+  }
+}
