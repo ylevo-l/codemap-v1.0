@@ -8,9 +8,37 @@ class ControlManager:
         self.ui_state = ui_state
         self.event_handlers: Dict[EventType, Callable[[Event], bool]] = {}
         nav_throttle = 0.0
-        self.throttle_intervals: Dict[EventType, float] = {EventType.NAVIGATION_UP: nav_throttle, EventType.NAVIGATION_DOWN: nav_throttle, EventType.TOGGLE_NODE: 0.02, EventType.TOGGLE_SUBTREE: 0.05, EventType.TOGGLE_DISABLE: 0.02, EventType.COPY_CONTENT: 0.1, EventType.REFACTOR_CONTENT: 0.1, EventType.QUIT: 0.0, EventType.ENTER_KEY: 0.02, EventType.SHIFT_MODE_CHANGED: 0.0, EventType.SHIFT_DISABLE_ALL: 0.1}
+        self.throttle_intervals: Dict[EventType, float] = {
+            EventType.NAVIGATION_UP: nav_throttle,
+            EventType.NAVIGATION_DOWN: nav_throttle,
+            EventType.TOGGLE_NODE: 0.02,
+            EventType.TOGGLE_SUBTREE: 0.05,
+            EventType.TOGGLE_DISABLE: 0.02,
+            EventType.COPY_CONTENT: 0.1,
+            EventType.REFACTOR_CONTENT: 0.1,
+            EventType.SAVE_CONTENT: 0.1,
+            EventType.LOAD_CONTENT: 0.1,
+            EventType.QUIT: 0.0,
+            EventType.ENTER_KEY: 0.02,
+            EventType.SHIFT_MODE_CHANGED: 0.0,
+            EventType.SHIFT_DISABLE_ALL: 0.1,
+        }
         self.last_event_times: Dict[EventType, float] = {}
-        self.event_priorities: Dict[EventType, int] = {EventType.QUIT: 100, EventType.SHIFT_MODE_CHANGED: 90, EventType.NAVIGATION_UP: 80, EventType.NAVIGATION_DOWN: 80, EventType.ENTER_KEY: 70, EventType.TOGGLE_NODE: 60, EventType.TOGGLE_SUBTREE: 50, EventType.TOGGLE_DISABLE: 40, EventType.COPY_CONTENT: 30, EventType.REFACTOR_CONTENT: 30, EventType.SHIFT_DISABLE_ALL: 20}
+        self.event_priorities: Dict[EventType, int] = {
+            EventType.QUIT: 100,
+            EventType.SHIFT_MODE_CHANGED: 90,
+            EventType.NAVIGATION_UP: 80,
+            EventType.NAVIGATION_DOWN: 80,
+            EventType.ENTER_KEY: 70,
+            EventType.TOGGLE_NODE: 60,
+            EventType.TOGGLE_SUBTREE: 50,
+            EventType.TOGGLE_DISABLE: 40,
+            EventType.COPY_CONTENT: 30,
+            EventType.REFACTOR_CONTENT: 30,
+            EventType.SAVE_CONTENT: 30,
+            EventType.LOAD_CONTENT: 30,
+            EventType.SHIFT_DISABLE_ALL: 20,
+        }
         self._key_event_cache: Dict[int, Event] = {}
         self._cache_expire = 60.0
         self._last_cache_flush = time.time()
@@ -67,6 +95,10 @@ class ControlManager:
             13: Event(EventType.ENTER_KEY, "keyboard"),
             ord("c"): Event(EventType.COPY_CONTENT, "keyboard"),
             ord("C"): Event(EventType.COPY_CONTENT, "keyboard"),
+            ord("b"): Event(EventType.SAVE_CONTENT, "keyboard"),
+            ord("B"): Event(EventType.SAVE_CONTENT, "keyboard"),
+            ord("v"): Event(EventType.LOAD_CONTENT, "keyboard"),
+            ord("V"): Event(EventType.LOAD_CONTENT, "keyboard"),
             ord("q"): Event(EventType.QUIT, "keyboard"),
             ord("Q"): Event(EventType.QUIT, "keyboard"),
             ord("e"): Event(EventType.TOGGLE_NODE, "keyboard") if not shift else Event(EventType.TOGGLE_SUBTREE, "keyboard"),
@@ -74,7 +106,7 @@ class ControlManager:
             ord("d"): Event(EventType.TOGGLE_DISABLE, "keyboard") if not shift else Event(EventType.SHIFT_DISABLE_ALL, "keyboard"),
             ord("D"): Event(EventType.TOGGLE_DISABLE, "keyboard") if not shift else Event(EventType.SHIFT_DISABLE_ALL, "keyboard"),
             ord("r"): Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift}),
-            ord("R"): Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift})
+            ord("R"): Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift}),
         }
         if hasattr(curses, "KEY_SR"):
             mapping[getattr(curses, "KEY_SR")] = Event(EventType.NAVIGATION_UP, "keyboard", {"shift": True})

@@ -1,27 +1,31 @@
-TOKEN_LABEL = "Tokens"
+TOKEN_LABEL="Tokens"
 
-COPY_LABEL = "[c] Copy"
+COPY_LABEL="[c] Copy"
 
-TOGGLE_LABEL = "[e] Toggle"
+SAVE_LABEL="[b] Save"
 
-TOGGLE_ALL_LABEL = "[E] Toggle All"
+LOAD_LABEL="[v] Load"
 
-ENABLE_LABEL = "[d] Enable"
+TOGGLE_LABEL="[e] Toggle"
 
-DISABLE_LABEL = "[d] Disable"
+TOGGLE_ALL_LABEL="[E] Toggle All"
 
-REFACTOR_LABEL = "[r] Refactor"
+ENABLE_LABEL="[d] Enable"
 
-REFACTOR_ALL_LABEL = "[R] Refactor All"
+DISABLE_LABEL="[d] Disable"
 
-NO_FILES_LABEL = "No files to display."
+REFACTOR_LABEL="[r] Refactor"
 
-NO_TOKENS_LABEL = "No tokens to copy."
+REFACTOR_ALL_LABEL="[R] Refactor All"
 
-SUCCESS_MESSAGE = "Successfully Copied to Clipboard"
+NO_FILES_LABEL="No files to display."
 
-REFACTOR_SUCCESS_MESSAGE = "File refactored successfully."
+NO_TOKENS_LABEL="No tokens to copy."
 
-REFACTOR_ALL_SUCCESS_MESSAGE = "All included files refactored successfully."
+SUCCESS_MESSAGE="Successfully Copied to Clipboard"
 
-SEPARATOR = "·"
+REFACTOR_SUCCESS_MESSAGE="File refactored successfully."
+
+REFACTOR_ALL_SUCCESS_MESSAGE="All included files refactored successfully."
+
+SEPARATOR="·"

@@ -11,7 +11,7 @@ from config.ui_labels import SEPARATOR
 from config.symbols import CURSOR_SYMBOL_SELECTED,CURSOR_SYMBOL_UNSELECTED,ARROW_COLLAPSED,ARROW_EXPANDED
 
 class Renderer:
-    def __init__(self,screen:any,state:State):
+    def __init__(self,screen,state:State):
         self.s=screen
         self.u=state
         self.h=self.w=0
@@ -19,7 +19,7 @@ class Renderer:
         self.pt=False
         self.pl=None
 
-    def _trunc(self,t:str,w:int)->str:
+    def _trunc(self,t,w):
         return t if w<=3 or len(t)<=w else t[:w-3]+"..."
 
     def _resize(self):
@@ -28,11 +28,11 @@ class Renderer:
             self.h,self.w=y,x
             self.s.clear()
 
-    def _tokvis(self,l:List[Tuple[TreeNode,int,bool]])->bool:
+    def _tokvis(self,l):
         o=self.u.scroll_offset
         return bool(l) and o<len(l) and l[o][2]
 
-    def _succ(self)->bool:
+    def _succ(self):
         if not self.u.copying_success:
             return False
         if time.time()-self.u.success_message_time>SUCCESS_MESSAGE_DURATION:
@@ -40,7 +40,7 @@ class Renderer:
             return False
         return True
 
-    def _line(self,n:TreeNode,d:int,st:bool,row:int,sel:bool):
+    def _line(self,n:TreeNode,d,row,sel,st):
         _,mx=self.s.getmaxyx()
         x=0
         cur=CURSOR_SYMBOL_SELECTED if sel else CURSOR_SYMBOL_UNSELECTED
@@ -63,19 +63,19 @@ class Renderer:
         if x<mx:
             clear_line(self.s,row,x)
 
-    def _view(self,l:List[Tuple[TreeNode,int,bool]],start:int,rows:int):
+    def _view(self,l,start,rows):
         end=min(start+rows,len(l))
         for r,idx in enumerate(range(start,end)):
             n,d,st=l[idx]
-            self._line(n,d,st,r,idx==self.u.current_index)
+            self._line(n,d,r,idx==self.u.current_index,st)
         for r in range(end-start,rows):
             clear_line(self.s,r,0)
 
-    def _footer(self,c:Optional[TreeNode],tot:int,tv:bool,succ:bool):
+    def _footer(self,c,tot,tv,succ):
         if succ:
             render_success_message(self.s,getattr(self.u,"success_message",""))
         else:
-            render_status_bar(self.s,c,self.u.physical_shift_pressed,tot,tv)
+            render_status_bar(self.s,c,self.u.physical_shift_pressed,self.u.physical_delete_pressed,tot,tv)
 
     def render(self,l:List[Tuple[TreeNode,int,bool]],c:Optional[TreeNode],tot:int):
         self._resize()
@@ -88,10 +88,10 @@ class Renderer:
             nr=self.u.current_index-self.u.scroll_offset
             if 0<=pr<rows:
                 n,d,st=l[self.pi]
-                self._line(n,d,st,pr,False)
+                self._line(n,d,pr,False,st)
             if 0<=nr<rows:
                 n,d,st=l[self.u.current_index]
-                self._line(n,d,st,nr,True)
+                self._line(n,d,nr,True,st)
         else:
             self._view(l,self.u.scroll_offset,rows)
         self._footer(c,tot,tv,succ)

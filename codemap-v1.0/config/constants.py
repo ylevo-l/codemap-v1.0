@@ -1,45 +1,33 @@
-import os, sys, tiktoken
+import os,sys,tiktoken,fnmatch,shutil,tempfile,stat,queue,threading,time,subprocess,curses,json,gc,signal,argparse
+from pathlib import Path
 
-def _get_state_file():
-    if sys.platform.startswith("win"):
-        base = os.getenv("APPDATA") or os.path.expanduser("~")
-        path = os.path.join(base, "CodeMap", "__tree_state__")
-    else:
-        base = os.getenv("XDG_STATE_HOME") or os.path.expanduser("~/.codemap")
-        path = os.path.join(base, "__tree_state__")
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-    except:
-        pass
-    return path
+STATE_FILE=os.path.join(os.getenv("APPDATA") or os.path.expanduser("~") if sys.platform.startswith("win") else os.getenv("XDG_STATE_HOME") or os.path.expanduser("~/.codemap"),"CodeMap","__tree_state__" if sys.platform.startswith("win") else "__tree_state__")
 
-STATE_FILE = _get_state_file()
+SNAPSHOT_DIR=os.path.join(os.getenv("APPDATA") or os.path.expanduser("~") if sys.platform.startswith("win") else os.getenv("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),"CodeMap","snapshots")
 
-SUCCESS_MESSAGE_DURATION = 1.0
+os.makedirs(SNAPSHOT_DIR,exist_ok=True)
 
-IGNORED_PATTERNS = ["__pycache__", "node_modules", "dist", "build", "venv", ".git", ".svn", ".hg", ".idea", ".vscode", ".env", ".DS_Store", "Thumbs.db", ".bak", ".tmp", "desktop.ini", ".log", ".db", ".key", ".pyc", ".exe", ".dll", ".so", ".dylib", "__tree_state__"]
+SUCCESS_MESSAGE_DURATION=1.0
 
-ALLOWED_EXTENSIONS = [".py", ".pyi", ".pyc", ".pyo", ".pyd", ".txt", ".md", ".rst", ".docx", ".pdf", ".odt", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".sh", ".bash", ".zsh", ".csh", ".ksh", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs", ".pl", ".php", ".tcl", ".lua", ".java", ".cpp", ".c", ".h", ".hpp", ".cs", ".go", ".rs", ".swift", ".vb", ".fs", ".sql", ".html", ".htm", ".css", ".scss", ".sass", ".less", ".xml"]
+IGNORED_PATTERNS=["__pycache__","node_modules","dist","build","venv",".git",".svn",".hg",".idea",".vscode",".env",".DS_Store","Thumbs.db",".bak",".tmp","desktop.ini",".log",".db",".key",".pyc",".exe",".dll",".so",".dylib","__tree_state__"]
 
-COPY_FORMAT_PRESETS = {"blocks": "{path}:\n\"\"\"\n{content}\n\"\"\"\n", "lines": "{path}: {content}\n", "raw": "{content}\n"}
+ALLOWED_EXTENSIONS=[".py",".pyi",".pyc",".pyo",".pyd",".txt",".md",".rst",".docx",".pdf",".odt",".yaml",".yml",".toml",".ini",".cfg",".sh",".bash",".zsh",".csh",".ksh",".bat",".cmd",".ps1",".vbs",".js",".ts",".tsx",".jsx",".mjs",".cjs",".pl",".php",".tcl",".lua",".java",".cpp",".c",".h",".hpp",".cs",".go",".rs",".swift",".vb",".fs",".sql",".html",".htm",".css",".scss",".sass",".less",".xml"]
 
-SCROLL_SPEED = {"normal": 1, "accelerated": 5}
+COPY_FORMAT_PRESETS={"blocks":"{path}:\n\"\"\"\n{content}\n\"\"\"\n","lines":"{path}: {content}\n","raw":"{content}\n","optimized":"{path}\n```{language}\n{content}\n```\n","compact":"```{language} {path}\n{content}\n```"}
 
-MAX_TREE_DEPTH = 10
+SCROLL_SPEED={"normal":1,"accelerated":5}
 
-INPUT_TIMEOUT = 0.001
+MAX_TREE_DEPTH=10
 
-CLEANUP_PATTERNS = ["__pycache__", "*.pyc", "*.pyo", "*.pyd", ".coverage", ".pytest_cache", ".hypothesis", "*.so", "*.c", "*.o"]
+INPUT_TIMEOUT=0.0
 
-CLEANUP_OPTIONS = {"enabled": True, "recursive": True, "follow_symlinks": False, "delete_empty_dirs": False}
+CLEANUP_PATTERNS=["__pycache__","*.pyc","*.pyo","*.pyd",".coverage",".pytest_cache",".hypothesis","*.so","*.c","*.o"]
 
-try:
-    ENCODING = tiktoken.encoding_for_model("gpt-4o")
+CLEANUP_OPTIONS={"enabled":True,"recursive":True,"follow_symlinks":False,"delete_empty_dirs":False}
 
-except KeyError:
-    sys.exit(1)
+ENCODING=tiktoken.encoding_for_model("gpt-4o")
 
-def count_tokens(content: str) -> int:
+def count_tokens(content:str)->int:
     return len(ENCODING.encode(content))
 
-__all__ = ["STATE_FILE", "SUCCESS_MESSAGE_DURATION", "IGNORED_PATTERNS", "ALLOWED_EXTENSIONS", "COPY_FORMAT_PRESETS", "SCROLL_SPEED", "MAX_TREE_DEPTH", "INPUT_TIMEOUT", "count_tokens", "CLEANUP_PATTERNS", "CLEANUP_OPTIONS"]
+__all__=["STATE_FILE","SNAPSHOT_DIR","SUCCESS_MESSAGE_DURATION","IGNORED_PATTERNS","ALLOWED_EXTENSIONS","COPY_FORMAT_PRESETS","SCROLL_SPEED","MAX_TREE_DEPTH","INPUT_TIMEOUT","count_tokens","CLEANUP_PATTERNS","CLEANUP_OPTIONS"]
