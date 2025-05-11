@@ -1,6 +1,5 @@
-import os
-import fnmatch
-from typing import Dict, List, Optional, Set
+import os, fnmatch
+from typing import Dict, List, Set
 from collections import OrderedDict
 
 class FileFilter:
@@ -9,15 +8,13 @@ class FileFilter:
 
     def __init__(self, ignored_patterns: List[str], allowed_extensions: List[str]):
         self.ignored_patterns = ignored_patterns
-        self.allowed_extensions = [ext.lower() for ext in allowed_extensions] if allowed_extensions else []
-        self._ignored_paths_cache = OrderedDict()
-        self._extension_cache = OrderedDict()
-        self._compiled_patterns = [(pattern, self._compile_pattern(pattern)) for pattern in ignored_patterns]
+        self.allowed_extensions: Set[str] = {ext.lower() for ext in allowed_extensions} if allowed_extensions else set()
+        self._ignored_paths_cache: Dict[str, bool] = OrderedDict()
+        self._extension_cache: Dict[str, bool] = OrderedDict()
+        self._compiled_patterns = [(p, self._compile_pattern(p)) for p in ignored_patterns]
 
     def _compile_pattern(self, pattern: str):
-        if '*' not in pattern and '?' not in pattern and '[' not in pattern:
-            return None
-        return pattern
+        return pattern if any(ch in pattern for ch in "*?[]") else None
 
     def _manage_cache_size(self) -> None:
         while len(self._ignored_paths_cache) > self.MAX_IGNORED_PATHS_CACHE_SIZE:
@@ -27,9 +24,9 @@ class FileFilter:
 
     def is_ignored(self, name: str) -> bool:
         if name in self._ignored_paths_cache:
-            result = self._ignored_paths_cache.pop(name)
-            self._ignored_paths_cache[name] = result
-            return result
+            res = self._ignored_paths_cache.pop(name)
+            self._ignored_paths_cache[name] = res
+            return res
         for pattern, compiled in self._compiled_patterns:
             if compiled is None:
                 if pattern in name:
@@ -44,17 +41,14 @@ class FileFilter:
         if ext:
             ext = ext.lower()
             if ext in self._extension_cache:
-                result = self._extension_cache.pop(ext)
-                self._extension_cache[ext] = result
-                self._ignored_paths_cache[name] = result
-                self._manage_cache_size()
-                return result
+                res = self._extension_cache.pop(ext)
+                self._extension_cache[ext] = res
             else:
-                result = bool(self.allowed_extensions and ext not in self.allowed_extensions)
-                self._extension_cache[ext] = result
-                self._ignored_paths_cache[name] = result
-                self._manage_cache_size()
-                return result
+                res = bool(self.allowed_extensions and ext not in self.allowed_extensions)
+                self._extension_cache[ext] = res
+            self._ignored_paths_cache[name] = res
+            self._manage_cache_size()
+            return res
         self._ignored_paths_cache[name] = False
         self._manage_cache_size()
         return False

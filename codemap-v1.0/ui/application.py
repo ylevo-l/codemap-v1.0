@@ -1,8 +1,8 @@
 import curses, time, threading, gc, signal
 from typing import Dict, List, Tuple, Optional
+import config.constants as cfg
 from core.model import TreeNode
 from core.operations import flatten_tree
-from config.constants import INPUT_TIMEOUT
 from ui.rendering import init_colors, Renderer
 from ui.core.state import State
 from ui.controls.manager import ControlManager
@@ -11,152 +11,118 @@ from ui.controls.actions import ActionHandler
 from core.utils.terminal import reset_terminal
 
 class Application:
-    def __init__(self, stdscr, root_node: TreeNode, path_to_node: Dict[str, TreeNode], fmt: str, path_mode: str, tree_changed_flag: threading.Event, lock: threading.Lock):
-        self.stdscr = stdscr
-        self.root_node = root_node
-        self.path_to_node = path_to_node
+    def __init__(self, stdscr, root_node: TreeNode, path_to_node: Dict[str, TreeNode],
+                 fmt: str, path_mode: str, tree_changed_flag: threading.Event, lock: threading.Lock):
+        self.s = stdscr
+        self.rn = root_node
+        self.p2n = path_to_node
         self.fmt = fmt
-        self.path_mode = path_mode
-        self.tree_changed_flag = tree_changed_flag
-        self.lock = lock
+        self.pm = path_mode
+        self.tc_flag = tree_changed_flag
+        self.l = lock
         self.resized = False
-        self._init_components()
+        self.fi = cfg.get_cli_refresh_interval()
+        self._init()
+        self._render()
 
-    def _init_components(self):
-        self._setup_curses()
-        self.ui_state = State()
-        self.flattened_cache: List[Tuple[TreeNode, int, bool]] = []
-        self.total_tokens = 0
-        self.selected_node_path: Optional[str] = None
-        self.action_caused_tree_change = False
-        self.last_tree_change_time = 0.0
-        self.last_input_time = time.time()
-        self.renderer = Renderer(self.stdscr, self.ui_state)
-        self.control_manager = ControlManager(self.ui_state)
-        self.keyboard_handler = KeyboardEventHandler(self.control_manager, self.ui_state)
-        self.action_handler = ActionHandler(self.stdscr, self.ui_state, self.root_node, self.path_to_node, self.fmt, self.path_mode, self.tree_changed_flag, self.lock)
-        self.action_handler.register_handlers(self.control_manager)
-        self.keyboard_handler.setup(callback_fn=self._redraw_on_shift_change)
-        self._rebuild_flattened_tree()
-
-    def _setup_curses(self):
-        curses.curs_set(0)
-        curses.noecho()
-        curses.cbreak()
+    def _init(self):
+        curses.curs_set(0); curses.noecho(); curses.cbreak()
         if hasattr(curses, "set_escdelay"):
-            try:
-                curses.set_escdelay(25)
-            except:
-                pass
-        self.stdscr.nodelay(True)
-        self.stdscr.keypad(True)
-        self.stdscr.timeout(int(INPUT_TIMEOUT * 1000))
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        init_colors()
-        self._setup_signal_handler()
+            try: curses.set_escdelay(25)
+            except: pass
+        self.s.nodelay(True); self.s.keypad(True); self.s.timeout(0)
+        self.s.clear(); self.s.refresh(); init_colors()
+        signal.signal(signal.SIGINT, lambda *_: curses.ungetch(ord("q")))
+        self.u = State()
+        self.cache: List[Tuple[TreeNode, int, bool]] = []
+        self.tot = 0
+        self.sel: Optional[str] = None
+        self.action_changed = False
+        self.renderer = Renderer(self.s, self.u)
+        self.cm = ControlManager(self.u)
+        self.kb = KeyboardEventHandler(self.cm, self.u)
+        self.ah = ActionHandler(self.s, self.u, self.rn, self.p2n,
+                                self.fmt, self.pm, self.tc_flag, self.l)
+        self.ah.register_handlers(self.cm)
+        self.kb.setup(callback_fn=self._render)
+        self._rebuild()
 
-    def _setup_signal_handler(self):
-        def _handler(signum, frame):
-            curses.ungetch(ord("q"))
-        signal.signal(signal.SIGINT, _handler)
-
-    def _redraw_on_shift_change(self):
-        self._update_screen()
-
-    def _rebuild_flattened_tree(self):
-        with self.lock:
-            self.root_node.calculate_token_count()
-            self.flattened_cache = list(flatten_tree(self.root_node, is_root=True))
-            self.total_tokens = self.root_node.token_count
-            if self.flattened_cache and 0 <= self.ui_state.current_index < len(self.flattened_cache):
-                self.selected_node_path = self.flattened_cache[self.ui_state.current_index][0].path
+    def _rebuild(self):
+        with self.l:
+            self.tot = self.rn.calculate_token_count()
+            self.cache = list(flatten_tree(self.rn, is_root=True))
+            if self.cache and 0 <= self.u.current_index < len(self.cache):
+                self.sel = self.cache[self.u.current_index][0].path
 
     def run(self):
         try:
-            needs_redraw = True
-            last_gc_time = time.time()
-            while not self.ui_state.should_quit:
-                now = time.time()
-                if now - last_gc_time > 5.0:
-                    gc.collect()
-                    last_gc_time = now
+            gc_t = time.perf_counter()
+            nxt = time.perf_counter() + self.fi
+            while not self.u.should_quit:
+                now = time.perf_counter()
                 if self.resized:
-                    curses.endwin()
-                    self.stdscr.refresh()
-                    self.resized = False
-                    needs_redraw = True
-                needs_redraw = self._process_events() or needs_redraw
-                if needs_redraw:
-                    self._update_screen()
-                    needs_redraw = False
-                if self._handle_input():
-                    self._update_screen()
-                if not self.tree_changed_flag.is_set():
-                    time.sleep(INPUT_TIMEOUT)
+                    curses.endwin(); self.s.refresh(); self.resized = False; self._render()
+                    nxt = now + self.fi
+                redraw = self._events()
+                if self._input(): redraw = True
+                if redraw:
+                    self._render()
+                    nxt = now + self.fi
+                if now - gc_t > 5.0:
+                    gc.collect(); gc_t = now
+                slp = nxt - time.perf_counter()
+                if slp > 0: time.sleep(slp)
+                else: nxt = time.perf_counter() + self.fi
         finally:
-            self.keyboard_handler.cleanup()
-            reset_terminal(self.stdscr)
+            self.kb.cleanup(); reset_terminal(self.s)
 
-    def _process_events(self) -> bool:
-        needs_redraw = False
-        now = time.time()
-        if self.ui_state.copying_success and now - self.ui_state.success_message_time > 1.0:
-            self.ui_state.copying_success = False
-            needs_redraw = True
-        if self.ui_state.redraw_needed.is_set():
-            self.ui_state.redraw_needed.clear()
-            needs_redraw = True
-        if self.tree_changed_flag.is_set():
-            if self.action_caused_tree_change or now - self.last_tree_change_time > 0.1:
-                self._handle_tree_change()
-                self.last_tree_change_time = now
-                needs_redraw = True
-        return needs_redraw
+    def _events(self) -> bool:
+        r = False
+        if self.tc_flag.is_set():
+            self._tree_change(); r = True
+        if self.u.redraw_needed.is_set():
+            self.u.redraw_needed.clear(); r = True
+        if self.u.clear_success_if_expired(1.0): r = True
+        return r
 
-    def _handle_input(self) -> bool:
-        key = self.stdscr.getch()
-        if key == curses.KEY_RESIZE:
+    def _input(self) -> bool:
+        k = self.s.getch()
+        if k == curses.KEY_RESIZE:
             self.resized = True
-            return True
-        if key != -1 and self.keyboard_handler.handle_key(key):
-            if self.tree_changed_flag.is_set():
-                self.action_caused_tree_change = True
+            return False
+        if k != -1 and self.kb.handle_key(k):
+            if self.tc_flag.is_set():
+                self.action_changed = True
             return True
         return False
 
-    def _handle_tree_change(self):
-        self._rebuild_flattened_tree()
-        with self.lock:
-            found = -1
-            if self.action_caused_tree_change and self.selected_node_path:
-                for i, (n, _, _) in enumerate(self.flattened_cache):
-                    if n.path == self.selected_node_path:
-                        found = i
+    def _tree_change(self):
+        self._rebuild()
+        with self.l:
+            if self.sel:
+                for i, (n, _, _) in enumerate(self.cache):
+                    if n.path == self.sel:
+                        self.u.current_index = i
                         break
-            if found != -1:
-                self.ui_state.current_index = found
             else:
-                self.ui_state.update_selected_index(0, len(self.flattened_cache))
-            self.tree_changed_flag.clear()
-        self.action_caused_tree_change = False
-        self.selected_node_path = None
+                self.u.update_selected_index(0, len(self.cache))
+            self.tc_flag.clear()
+        self.action_changed = False
+        self.sel = None
 
-    def _update_screen(self):
-        max_y, _ = self.stdscr.getmaxyx()
-        visible = max_y - 1
-        with self.lock:
-            self.total_tokens = self.root_node.calculate_token_count()
-            self.ui_state.ensure_visible(visible, len(self.flattened_cache))
-            current_node = None
-            if self.flattened_cache and 0 <= self.ui_state.current_index < len(self.flattened_cache):
-                current_node = self.flattened_cache[self.ui_state.current_index][0]
-                if not self.action_caused_tree_change:
-                    self.selected_node_path = current_node.path
-                self.action_handler.update_context(current_node, self.flattened_cache)
-            self.renderer.render(self.flattened_cache, current_node, self.total_tokens)
+    def _render(self):
+        rows = self.s.getmaxyx()[0] - 1
+        with self.l:
+            if self.action_changed:
+                self.tot = self.rn.calculate_token_count()
+                self.action_changed = False
+            self.u.ensure_visible(rows, len(self.cache))
+            cur = None
+            if self.cache and 0 <= self.u.current_index < len(self.cache):
+                cur = self.cache[self.u.current_index][0]
+                self.ah.update_context(cur, self.cache)
+            self.renderer.render(self.cache, cur, self.tot)
 
 def run_application(stdscr,root_node:TreeNode,path_to_node:Dict[str,TreeNode],fmt:str,path_mode:str,tree_changed_flag:threading.Event,lock:threading.Lock):
     if hasattr(curses,"update_lines_cols"):curses.update_lines_cols()
-    app=Application(stdscr,root_node,path_to_node,fmt,path_mode,tree_changed_flag,lock)
-    app.run()
+    Application(stdscr,root_node,path_to_node,fmt,path_mode,tree_changed_flag,lock).run()

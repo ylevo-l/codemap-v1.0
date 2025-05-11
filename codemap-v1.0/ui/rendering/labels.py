@@ -4,9 +4,10 @@ from core.model import TreeNode
 from ui.rendering.text import safe_addnstr
 from ui.rendering.colors import GENERAL_UI_COLOR,UI_BRACKET_COLOR,DISABLED_COLOR
 from ui.core.labels import render_single_label
-from config.ui_labels import COPY_LABEL,TOGGLE_LABEL,TOGGLE_ALL_LABEL,ENABLE_LABEL,DISABLE_LABEL,NO_FILES_LABEL,NO_TOKENS_LABEL,SEPARATOR,REFACTOR_LABEL,REFACTOR_ALL_LABEL,SAVE_LABEL,LOAD_LABEL
+from config.ui_labels import COPY_LABEL,PASTE_LABEL,TOGGLE_LABEL,TOGGLE_ALL_LABEL,ENABLE_LABEL,DISABLE_LABEL,NO_FILES_LABEL,NO_TOKENS_LABEL,SEPARATOR,REFACTOR_LABEL,REFACTOR_ALL_LABEL,SAVE_LABEL,LOAD_LABEL
 from core.operations.tree_ops import are_all_files_enabled
-from core.utils.persistence import has_snapshot
+from core.utils.snapshot import has_snapshot
+from core.utils.clipboard import has_valid_paste
 
 _BRACKET_PATTERN=re.compile(r'(\[[^\]]+\])(.*)')
 
@@ -21,6 +22,9 @@ def _compact(t,shift):
         return t[:-4]
     return t
 
+def _upper_bracket(lbl):
+    return re.sub(r'\[([a-z])\]',lambda m:f'[{m.group(1).upper()}]',lbl)
+
 def _create_node_labels(current:Optional[TreeNode],shift:bool,delete_mode:bool)->List[str]:
     labels=[]
     if current:
@@ -30,16 +34,21 @@ def _create_node_labels(current:Optional[TreeNode],shift:bool,delete_mode:bool)-
             if shift and current.expanded:
                 labels.append(_compact(REFACTOR_ALL_LABEL,shift))
             if shift:
-                labels.append("[D] Disable" if are_all_files_enabled(current) else "[D] Enable")
+                dlabel=DISABLE_LABEL if are_all_files_enabled(current) else ENABLE_LABEL
+                labels.append(_upper_bracket(dlabel))
             labels.append(LOAD_LABEL if snap else SAVE_LABEL)
-            if current.expanded and not delete_mode:
+            if current.expanded:
                 labels.append(COPY_LABEL)
+            if has_valid_paste(current.path,True):
+                labels.append(PASTE_LABEL)
         else:
             labels.append(ENABLE_LABEL if current.disabled else DISABLE_LABEL)
             labels.append(REFACTOR_LABEL)
             labels.append(LOAD_LABEL if snap else SAVE_LABEL)
-            if not current.disabled and not delete_mode:
+            if not current.disabled:
                 labels.append(COPY_LABEL)
+            if has_valid_paste(current.path,False):
+                labels.append(PASTE_LABEL)
     else:
         labels.append(NO_FILES_LABEL)
     return labels

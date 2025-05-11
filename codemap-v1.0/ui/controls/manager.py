@@ -1,5 +1,6 @@
 import time, curses
-from typing import Dict, Callable, Optional, List
+from typing import Dict, Callable, Optional
+from config import CLI_REFRESH_INTERVAL
 from ui.controls.events import Event, EventType
 from ui.core.state import State
 
@@ -7,125 +8,89 @@ class ControlManager:
     def __init__(self, ui_state: State):
         self.ui_state = ui_state
         self.event_handlers: Dict[EventType, Callable[[Event], bool]] = {}
-        nav_throttle = 0.0
-        self.throttle_intervals: Dict[EventType, float] = {
-            EventType.NAVIGATION_UP: nav_throttle,
-            EventType.NAVIGATION_DOWN: nav_throttle,
-            EventType.TOGGLE_NODE: 0.02,
-            EventType.TOGGLE_SUBTREE: 0.05,
-            EventType.TOGGLE_DISABLE: 0.02,
-            EventType.COPY_CONTENT: 0.1,
-            EventType.REFACTOR_CONTENT: 0.1,
-            EventType.SAVE_CONTENT: 0.1,
-            EventType.LOAD_CONTENT: 0.1,
-            EventType.QUIT: 0.0,
-            EventType.ENTER_KEY: 0.02,
-            EventType.SHIFT_MODE_CHANGED: 0.0,
-            EventType.SHIFT_DISABLE_ALL: 0.1,
+        base = CLI_REFRESH_INTERVAL
+        self.throttle = {
+            EventType.NAVIGATION_UP: 0.0,
+            EventType.NAVIGATION_DOWN: 0.0,
+            EventType.TOGGLE_NODE: base * 2,
+            EventType.TOGGLE_SUBTREE: base * 3,
+            EventType.TOGGLE_DISABLE: base * 2,
+            EventType.COPY_CONTENT: base * 4,
+            EventType.PASTE_CONTENT: base * 4,
+            EventType.REFACTOR_CONTENT: base * 4,
+            EventType.SAVE_CONTENT: base * 4,
+            EventType.LOAD_CONTENT: base * 4,
+            EventType.SHIFT_DISABLE_ALL: base * 4,
         }
-        self.last_event_times: Dict[EventType, float] = {}
-        self.event_priorities: Dict[EventType, int] = {
-            EventType.QUIT: 100,
-            EventType.SHIFT_MODE_CHANGED: 90,
-            EventType.NAVIGATION_UP: 80,
-            EventType.NAVIGATION_DOWN: 80,
-            EventType.ENTER_KEY: 70,
-            EventType.TOGGLE_NODE: 60,
-            EventType.TOGGLE_SUBTREE: 50,
-            EventType.TOGGLE_DISABLE: 40,
-            EventType.COPY_CONTENT: 30,
-            EventType.REFACTOR_CONTENT: 30,
-            EventType.SAVE_CONTENT: 30,
-            EventType.LOAD_CONTENT: 30,
-            EventType.SHIFT_DISABLE_ALL: 20,
-        }
-        self._key_event_cache: Dict[int, Event] = {}
-        self._cache_expire = 60.0
-        self._last_cache_flush = time.time()
-        self.event_queue: List[Event] = []
+        self.last: Dict[EventType, float] = {}
+        self._key_map = self._build_key_map()
 
-    def register_handler(self, event_type: EventType, handler: Callable[[Event], bool]):
-        self.event_handlers[event_type] = handler
-        self._key_event_cache.clear()
+    def _build_key_map(self) -> Dict[int, Event]:
+        import curses
+        m = {}
+        def add(k, e): m[k] = e
+        nav_up = [ord("w"), ord("W"), curses.KEY_UP]
+        nav_dn = [ord("s"), ord("S"), curses.KEY_DOWN]
+        for k in nav_up: add(k, Event(EventType.NAVIGATION_UP, "keyboard"))
+        for k in nav_dn: add(k, Event(EventType.NAVIGATION_DOWN, "keyboard"))
+        add(ord("c"), Event(EventType.COPY_CONTENT, "keyboard"))
+        add(ord("C"), Event(EventType.COPY_CONTENT, "keyboard"))
+        add(ord("p"), Event(EventType.PASTE_CONTENT, "keyboard"))
+        add(ord("P"), Event(EventType.PASTE_CONTENT, "keyboard"))
+        add(ord("b"), Event(EventType.SAVE_CONTENT, "keyboard"))
+        add(ord("B"), Event(EventType.SAVE_CONTENT, "keyboard"))
+        add(ord("v"), Event(EventType.LOAD_CONTENT, "keyboard"))
+        add(ord("V"), Event(EventType.LOAD_CONTENT, "keyboard"))
+        add(ord("q"), Event(EventType.QUIT, "keyboard"))
+        add(ord("Q"), Event(EventType.QUIT, "keyboard"))
+        add(ord("e"), Event(EventType.TOGGLE_NODE, "keyboard"))
+        add(ord("E"), Event(EventType.TOGGLE_NODE, "keyboard"))
+        add(ord("d"), Event(EventType.TOGGLE_DISABLE, "keyboard"))
+        add(ord("D"), Event(EventType.TOGGLE_DISABLE, "keyboard"))
+        add(ord("r"), Event(EventType.REFACTOR_CONTENT, "keyboard"))
+        add(ord("R"), Event(EventType.REFACTOR_CONTENT, "keyboard"))
+        add(curses.KEY_ENTER, Event(EventType.ENTER_KEY, "keyboard"))
+        add(10, Event(EventType.ENTER_KEY, "keyboard"))
+        add(13, Event(EventType.ENTER_KEY, "keyboard"))
+        if hasattr(curses, "KEY_SR"): add(getattr(curses, "KEY_SR"), Event(EventType.NAVIGATION_UP, "keyboard"))
+        if hasattr(curses, "KEY_SF"): add(getattr(curses, "KEY_SF"), Event(EventType.NAVIGATION_DOWN, "keyboard"))
+        return m
 
-    def _is_throttled(self, event_type: EventType) -> bool:
-        interval = self.throttle_intervals.get(event_type, 0.0)
+    def register_handler(self, et: EventType, h: Callable[[Event], bool]):
+        self.event_handlers[et] = h
+
+    def _throttled(self, et: EventType) -> bool:
+        interval = self.throttle.get(et, 0.0)
         if interval == 0.0:
             return False
-        now = time.time()
-        last = self.last_event_times.get(event_type, 0.0)
+        now = time.perf_counter()
+        last = self.last.get(et, 0.0)
         if now - last < interval:
             return True
-        self.last_event_times[event_type] = now
+        self.last[et] = now
         return False
 
-    def handle_event(self, event: Event) -> bool:
-        if event.event_type not in self.event_handlers:
+    def handle_event(self, e: Event) -> bool:
+        if e.event_type not in self.event_handlers:
             return False
-        if self._is_throttled(event.event_type):
+        if self._throttled(e.event_type):
             return False
         try:
-            return self.event_handlers[event.event_type](event)
+            return self.event_handlers[e.event_type](e)
         except:
             return False
 
-    def _flush_cache_if_needed(self):
-        now = time.time()
-        if now - self._last_cache_flush > self._cache_expire:
-            self._key_event_cache.clear()
-            self._last_cache_flush = now
-
-    def get_event_from_key(self, key: int) -> Optional[Event]:
-        self._flush_cache_if_needed()
-        if key in self._key_event_cache:
-            evt = self._key_event_cache[key]
-            if evt.event_type in (EventType.NAVIGATION_UP, EventType.NAVIGATION_DOWN):
-                evt.data = {"shift": self.ui_state.physical_shift_pressed}
-            return evt
+    def get_event_from_key(self, k: int) -> Optional[Event]:
+        if k not in self._key_map:
+            return None
+        base_event = self._key_map[k]
         shift = self.ui_state.physical_shift_pressed
-        mapping = {
-            ord("w"): Event(EventType.NAVIGATION_UP, "keyboard", {"shift": shift}),
-            ord("W"): Event(EventType.NAVIGATION_UP, "keyboard", {"shift": shift}),
-            curses.KEY_UP: Event(EventType.NAVIGATION_UP, "keyboard", {"shift": shift}),
-            ord("s"): Event(EventType.NAVIGATION_DOWN, "keyboard", {"shift": shift}),
-            ord("S"): Event(EventType.NAVIGATION_DOWN, "keyboard", {"shift": shift}),
-            curses.KEY_DOWN: Event(EventType.NAVIGATION_DOWN, "keyboard", {"shift": shift}),
-            curses.KEY_ENTER: Event(EventType.ENTER_KEY, "keyboard"),
-            10: Event(EventType.ENTER_KEY, "keyboard"),
-            13: Event(EventType.ENTER_KEY, "keyboard"),
-            ord("c"): Event(EventType.COPY_CONTENT, "keyboard"),
-            ord("C"): Event(EventType.COPY_CONTENT, "keyboard"),
-            ord("b"): Event(EventType.SAVE_CONTENT, "keyboard"),
-            ord("B"): Event(EventType.SAVE_CONTENT, "keyboard"),
-            ord("v"): Event(EventType.LOAD_CONTENT, "keyboard"),
-            ord("V"): Event(EventType.LOAD_CONTENT, "keyboard"),
-            ord("q"): Event(EventType.QUIT, "keyboard"),
-            ord("Q"): Event(EventType.QUIT, "keyboard"),
-            ord("e"): Event(EventType.TOGGLE_NODE, "keyboard") if not shift else Event(EventType.TOGGLE_SUBTREE, "keyboard"),
-            ord("E"): Event(EventType.TOGGLE_NODE, "keyboard") if not shift else Event(EventType.TOGGLE_SUBTREE, "keyboard"),
-            ord("d"): Event(EventType.TOGGLE_DISABLE, "keyboard") if not shift else Event(EventType.SHIFT_DISABLE_ALL, "keyboard"),
-            ord("D"): Event(EventType.TOGGLE_DISABLE, "keyboard") if not shift else Event(EventType.SHIFT_DISABLE_ALL, "keyboard"),
-            ord("r"): Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift}),
-            ord("R"): Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift}),
-        }
-        if hasattr(curses, "KEY_SR"):
-            mapping[getattr(curses, "KEY_SR")] = Event(EventType.NAVIGATION_UP, "keyboard", {"shift": True})
-        if hasattr(curses, "KEY_SF"):
-            mapping[getattr(curses, "KEY_SF")] = Event(EventType.NAVIGATION_DOWN, "keyboard", {"shift": True})
-        if key in mapping:
-            self._key_event_cache[key] = mapping[key]
-            return mapping[key]
-        return None
-
-    def queue_event(self, event: Event):
-        self.event_queue.append(event)
-
-    def process_queued_events(self) -> bool:
-        if not self.event_queue:
-            return False
-        self.event_queue.sort(key=lambda e: self.event_priorities.get(e.event_type, 0), reverse=True)
-        processed = False
-        while self.event_queue:
-            if self.handle_event(self.event_queue.pop(0)):
-                processed = True
-        return processed
+        if base_event.event_type in (EventType.NAVIGATION_UP, EventType.NAVIGATION_DOWN):
+            return Event(base_event.event_type, "keyboard", {"shift": shift})
+        if base_event.event_type == EventType.TOGGLE_NODE:
+            return Event(EventType.TOGGLE_SUBTREE if shift else EventType.TOGGLE_NODE, "keyboard")
+        if base_event.event_type == EventType.TOGGLE_DISABLE:
+            return Event(EventType.SHIFT_DISABLE_ALL if shift else EventType.TOGGLE_DISABLE, "keyboard")
+        if base_event.event_type == EventType.REFACTOR_CONTENT:
+            return Event(EventType.REFACTOR_CONTENT, "keyboard", {"shift": shift})
+        return base_event

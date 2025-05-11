@@ -1,4 +1,5 @@
 from typing import Generator, Tuple, Set, Optional
+
 from core.model.tree_node import TreeNode
 
 def toggle_node(node: TreeNode) -> None:

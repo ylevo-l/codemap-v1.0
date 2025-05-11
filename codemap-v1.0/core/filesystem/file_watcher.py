@@ -25,44 +25,71 @@ class _WatchdogHandler(FileSystemEventHandler):
 
     def _add_file(self, path: str, is_dir: bool) -> None:
         parent_path = os.path.dirname(path)
+        node_added = False
+        new_node = None
         with self.lock:
             parent = self.path_to_node.get(parent_path)
-            if not parent or not parent.is_dir:
-                return
-            node = TreeNode(path, is_dir, parent)
-            parent.add_child(node)
-            parent.sort_children()
-            self.path_to_node[path] = node
-        if not is_dir:
-            token_count_manager.queue_token_count(path, self._token_cb)
+            if parent and parent.is_dir and path not in self.path_to_node:
+                new_node = TreeNode(path, is_dir, parent)
+                parent.add_child(new_node)
+                parent.sort_children()
+                self.path_to_node[path] = new_node
+                node_added = True
+        if node_added:
+            self.tree_changed_flag.set()
+            if not is_dir and new_node:
+                token_count_manager.queue_token_count(path, self._token_cb)
 
     def _remove_file(self, path: str) -> None:
+        node_removed = False
+        original_count = 0
+        parent_node = None
+        is_file = False
+        is_disabled = False
+        parent_was_expanded = False
         with self.lock:
             node = self.path_to_node.pop(path, None)
-            if not node:
-                return
-            if node.parent:
-                try:
-                    node.parent.children.remove(node)
-                except ValueError:
-                    pass
-                if not node.is_dir and not node.disabled:
-                    node.parent.update_token_count(-node.token_count)
-        self.tree_changed_flag.set()
-
-    def _token_cb(self, node_path: str, count: int) -> None:
-        with self.lock:
-            node = self.path_to_node.get(node_path)
-            if not node or node.is_dir or node.disabled:
-                return
-            update_node_token_count(node, count)
+            if node:
+                node_removed = True
+                parent_node = node.parent
+                is_file = not node.is_dir
+                if is_file:
+                    is_disabled = node.disabled
+                    original_count = node.token_count
+                if parent_node:
+                    parent_was_expanded = parent_node.expanded
+                    try:
+                        parent_node.children.remove(node)
+                    except ValueError:
+                        pass
+                if is_file and not is_disabled and original_count > 0 and parent_node and parent_was_expanded:
+                    curr = parent_node
+                    while curr and curr.expanded:
+                        curr.token_count -= original_count
+                        curr = curr.parent
+        if node_removed:
             self.tree_changed_flag.set()
 
+    def _token_cb(self, node_path: str, count: int) -> None:
+        node_updated = False
+        with self.lock:
+            node = self.path_to_node.get(node_path)
+            if node and not node.is_dir:
+                 changed = update_node_token_count(node, count)
+                 if changed:
+                    node_updated = True
+        if node_updated:
+             self.tree_changed_flag.set()
+
     def on_created(self, event: FileSystemEvent):
-        if self.file_filter.is_ignored(os.path.basename(event.src_path)):
+        base_name = os.path.basename(event.src_path)
+        if self.file_filter.is_ignored(base_name):
             return
+        if not event.is_directory:
+             _, ext = os.path.splitext(base_name)
+             if self.file_filter.allowed_extensions and ext.lower() not in self.file_filter.allowed_extensions:
+                 return
         self._add_file(event.src_path, event.is_directory)
-        self.tree_changed_flag.set()
 
     def on_deleted(self, event: FileSystemEvent):
         self._remove_file(event.src_path)
@@ -70,15 +97,24 @@ class _WatchdogHandler(FileSystemEventHandler):
     def on_modified(self, event: FileSystemEvent):
         if event.is_directory:
             return
-        if self.file_filter.is_ignored(os.path.basename(event.src_path)):
+        base_name = os.path.basename(event.src_path)
+        if self.file_filter.is_ignored(base_name):
+            return
+        _, ext = os.path.splitext(base_name)
+        if self.file_filter.allowed_extensions and ext.lower() not in self.file_filter.allowed_extensions:
             return
         token_count_manager.queue_token_count(event.src_path, self._token_cb, force_update=True)
 
     def on_moved(self, event: FileSystemEvent):
         self._remove_file(event.src_path)
-        if not self.file_filter.is_ignored(os.path.basename(event.dest_path)):
-            self._add_file(event.dest_path, event.is_directory)
-        self.tree_changed_flag.set()
+        dest_base_name = os.path.basename(event.dest_path)
+        if self.file_filter.is_ignored(dest_base_name):
+             return
+        if not event.is_directory:
+             _, ext = os.path.splitext(dest_base_name)
+             if self.file_filter.allowed_extensions and ext.lower() not in self.file_filter.allowed_extensions:
+                 return
+        self._add_file(event.dest_path, event.is_directory)
 
 def watch_filesystem(
     root_path: str,

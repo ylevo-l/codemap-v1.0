@@ -7,6 +7,7 @@ class EventType(Enum):
     TOGGLE_SUBTREE=auto()
     TOGGLE_DISABLE=auto()
     COPY_CONTENT=auto()
+    PASTE_CONTENT=auto()
     REFACTOR_CONTENT=auto()
     SAVE_CONTENT=auto()
     LOAD_CONTENT=auto()
