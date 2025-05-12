@@ -1,10 +1,10 @@
-import os, fnmatch
+import os, fnmatch, threading
 from typing import Dict, List, Set
 from collections import OrderedDict
 
 class FileFilter:
-    MAX_IGNORED_PATHS_CACHE_SIZE = 10000
-    MAX_EXTENSION_CACHE_SIZE = 1000
+    MAX_IGNORED_PATHS_CACHE_SIZE = 10_000
+    MAX_EXTENSION_CACHE_SIZE = 1_000
 
     def __init__(self, ignored_patterns: List[str], allowed_extensions: List[str]):
         self.ignored_patterns = ignored_patterns
@@ -12,6 +12,7 @@ class FileFilter:
         self._ignored_paths_cache: Dict[str, bool] = OrderedDict()
         self._extension_cache: Dict[str, bool] = OrderedDict()
         self._compiled_patterns = [(p, self._compile_pattern(p)) for p in ignored_patterns]
+        self._lock = threading.RLock()
 
     def _compile_pattern(self, pattern: str):
         return pattern if any(ch in pattern for ch in "*?[]") else None
@@ -23,36 +24,38 @@ class FileFilter:
             self._extension_cache.popitem(last=False)
 
     def is_ignored(self, name: str) -> bool:
-        if name in self._ignored_paths_cache:
-            res = self._ignored_paths_cache.pop(name)
-            self._ignored_paths_cache[name] = res
-            return res
-        for pattern, compiled in self._compiled_patterns:
-            if compiled is None:
-                if pattern in name:
+        with self._lock:
+            if name in self._ignored_paths_cache:
+                res = self._ignored_paths_cache.pop(name)
+                self._ignored_paths_cache[name] = res
+                return res
+            for pattern, compiled in self._compiled_patterns:
+                if compiled is None:
+                    if pattern in name:
+                        self._ignored_paths_cache[name] = True
+                        self._manage_cache_size()
+                        return True
+                elif fnmatch.fnmatch(name, pattern):
                     self._ignored_paths_cache[name] = True
                     self._manage_cache_size()
                     return True
-            elif fnmatch.fnmatch(name, pattern):
-                self._ignored_paths_cache[name] = True
+            _, ext = os.path.splitext(name)
+            if ext:
+                ext = ext.lower()
+                if ext in self._extension_cache:
+                    res = self._extension_cache.pop(ext)
+                    self._extension_cache[ext] = res
+                else:
+                    res = bool(self.allowed_extensions and ext not in self.allowed_extensions)
+                    self._extension_cache[ext] = res
+                self._ignored_paths_cache[name] = res
                 self._manage_cache_size()
-                return True
-        _, ext = os.path.splitext(name)
-        if ext:
-            ext = ext.lower()
-            if ext in self._extension_cache:
-                res = self._extension_cache.pop(ext)
-                self._extension_cache[ext] = res
-            else:
-                res = bool(self.allowed_extensions and ext not in self.allowed_extensions)
-                self._extension_cache[ext] = res
-            self._ignored_paths_cache[name] = res
+                return res
+            self._ignored_paths_cache[name] = False
             self._manage_cache_size()
-            return res
-        self._ignored_paths_cache[name] = False
-        self._manage_cache_size()
-        return False
+            return False
 
     def clear_cache(self) -> None:
-        self._ignored_paths_cache.clear()
-        self._extension_cache.clear()
+        with self._lock:
+            self._ignored_paths_cache.clear()
+            self._extension_cache.clear()

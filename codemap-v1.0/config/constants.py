@@ -1,9 +1,7 @@
 import os, sys, functools, tiktoken, subprocess, re
-
 from pathlib import Path
 
 @functools.lru_cache(maxsize=1)
-
 def _detect_refresh_rate() -> float:
     try:
         if sys.platform.startswith("win"):
@@ -31,15 +29,13 @@ def _env_rate() -> float:
         return 0.0
 
 @functools.lru_cache(maxsize=1)
-
 def get_refresh_rate() -> float:
     return _env_rate() or _detect_refresh_rate() or 144.0
 
 def get_cli_refresh_interval() -> float:
-    return 1.0 / max(240.0, get_refresh_rate())
+    return 1.0 / max(480.0, get_refresh_rate())
 
 STATE_FILE = os.path.join(
-
     (os.getenv("APPDATA") or Path.home()) if sys.platform.startswith("win") else (os.getenv("XDG_STATE_HOME") or Path.home() / ".codemap"),
     "CodeMap",
     "__tree_state__",
@@ -47,7 +43,6 @@ STATE_FILE = os.path.join(
 )
 
 SNAPSHOT_DIR = os.path.join(
-
     (os.getenv("APPDATA") or Path.home()) if sys.platform.startswith("win") else (os.getenv("XDG_DATA_HOME") or Path.home() / ".local/share"),
     "CodeMap",
     "snapshots",
@@ -61,7 +56,6 @@ SUCCESS_MESSAGE_DURATION = 1.0
 CLI_REFRESH_INTERVAL = get_cli_refresh_interval()
 
 IGNORED_PATTERNS = [
-
     "__pycache__", "node_modules", "dist", "build", "venv", ".git", ".svn", ".hg",
     ".idea", ".vscode", ".env", ".DS_Store", "Thumbs.db", ".bak", ".tmp",
     "desktop.ini", ".log", ".db", ".key", ".pyc", ".exe", ".dll", ".so",
@@ -70,7 +64,6 @@ IGNORED_PATTERNS = [
 ]
 
 ALLOWED_EXTENSIONS = [
-
     ".py", ".pyi", ".pyc", ".pyo", ".pyd", ".txt", ".md", ".rst", ".docx", ".pdf",
     ".odt", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".sh", ".bash", ".zsh",
     ".csh", ".ksh", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".ts", ".tsx", ".jsx",
@@ -81,7 +74,6 @@ ALLOWED_EXTENSIONS = [
 ]
 
 COPY_FORMAT_PRESETS = {
-
     "blocks": "{path}:\n\"\"\"\n{content}\n\"\"\"\n",
     "lines": "{path}: {content}\n",
     "raw": "{content}\n",
@@ -107,7 +99,6 @@ def count_tokens(content: str) -> int:
     return len(ENCODING.encode(content))
 
 __all__ = [
-
     "STATE_FILE", "SNAPSHOT_DIR", "SUCCESS_MESSAGE_DURATION", "CLI_REFRESH_INTERVAL",
     "IGNORED_PATTERNS", "ALLOWED_EXTENSIONS", "COPY_FORMAT_PRESETS", "SCROLL_SPEED",
     "MAX_TREE_DEPTH", "INPUT_TIMEOUT", "count_tokens", "CLEANUP_PATTERNS",
