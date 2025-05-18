@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 
 def _fits(char: str) -> bool:
     enc = sys.stdout.encoding or "utf-8"
@@ -27,11 +28,9 @@ BRANCH_JUNCTION = _pick("├─", "|-")
 
 BRANCH_LAST     = _pick("└─", "`-")
 
-BRANCH_SYMBOL   = BRANCH_VERTICAL
-
 __all__ = [
     "CURSOR_SYMBOL_SELECTED", "CURSOR_SYMBOL_UNSELECTED", "CURSOR_SYMBOL",
     "ARROW_COLLAPSED", "ARROW_EXPANDED",
-    "BRANCH_VERTICAL", "BRANCH_JUNCTION", "BRANCH_LAST", "BRANCH_SYMBOL"
+    "BRANCH_VERTICAL", "BRANCH_JUNCTION", "BRANCH_LAST",
 
 ]

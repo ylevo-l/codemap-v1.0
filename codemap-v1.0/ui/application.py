@@ -11,8 +11,16 @@ from ui.controls.actions import ActionHandler
 from core.utils.terminal import reset_terminal
 
 class Application:
-    def __init__(self, stdscr, root_node: TreeNode, path_to_node: Dict[str, TreeNode],
-                 fmt: str, path_mode: str, tree_changed_flag: threading.Event, lock: threading.Lock):
+    def __init__(
+        self,
+        stdscr,
+        root_node: TreeNode,
+        path_to_node: Dict[str, TreeNode],
+        fmt: str,
+        path_mode: str,
+        tree_changed_flag: threading.Event,
+        lock: threading.Lock,
+    ):
         self.s = stdscr
         self.rn = root_node
         self.p2n = path_to_node
@@ -26,23 +34,39 @@ class Application:
         self._render()
 
     def _init(self):
-        curses.curs_set(0); curses.noecho(); curses.cbreak()
+        curses.curs_set(0)
+        curses.noecho()
+        curses.cbreak()
         if hasattr(curses, "set_escdelay"):
-            try: curses.set_escdelay(25)
-            except: pass
-        self.s.nodelay(True); self.s.keypad(True); self.s.timeout(0)
-        self.s.clear(); self.s.refresh(); init_colors()
+            try:
+                curses.set_escdelay(25)
+            except:
+                pass
+        self.s.nodelay(True)
+        self.s.keypad(True)
+        self.s.timeout(0)
+        self.s.clear()
+        self.s.refresh()
+        init_colors()
         signal.signal(signal.SIGINT, lambda *_: curses.ungetch(ord("q")))
         self.u = State()
-        self.cache: List[Tuple[TreeNode, int, bool]] = []
+        self.cache: List[Tuple[TreeNode, str, bool]] = []
         self.tot = 0
         self.sel: Optional[str] = None
         self.action_changed = False
         self.renderer = Renderer(self.s, self.u)
         self.cm = ControlManager(self.u)
         self.kb = KeyboardEventHandler(self.cm, self.u)
-        self.ah = ActionHandler(self.s, self.u, self.rn, self.p2n,
-                                self.fmt, self.pm, self.tc_flag, self.l)
+        self.ah = ActionHandler(
+            self.s,
+            self.u,
+            self.rn,
+            self.p2n,
+            self.fmt,
+            self.pm,
+            self.tc_flag,
+            self.l,
+        )
         self.ah.register_handlers(self.cm)
         self.kb.setup(callback_fn=self._render)
         self._rebuild()
@@ -57,32 +81,46 @@ class Application:
     def run(self):
         try:
             gc_t = time.perf_counter()
-            nxt = time.perf_counter() + self.fi
+            nxt = time.perf_counter()
             while not self.u.should_quit:
                 now = time.perf_counter()
                 if self.resized:
-                    curses.endwin(); self.s.refresh(); self.resized = False; self._render()
-                    nxt = now + self.fi
+                    curses.endwin()
+                    self.s.refresh()
+                    self.resized = False
+                    self._render()
+                    nxt = now
                 redraw = self._events()
-                if self._input(): redraw = True
+                handled = self._input()
+                if handled:
+                    if self.tc_flag.is_set():
+                        self._tree_change()
+                    redraw = True
                 if redraw:
                     self._render()
-                    nxt = now + self.fi
+                    nxt = time.perf_counter()
                 if now - gc_t > 5.0:
-                    gc.collect(); gc_t = now
-                slp = nxt - time.perf_counter()
-                if slp > 0: time.sleep(slp)
-                else: nxt = time.perf_counter() + self.fi
+                    gc.collect()
+                    gc_t = now
+                slp = nxt + self.fi - time.perf_counter()
+                if slp > 0:
+                    time.sleep(min(slp, 0.002))
+                else:
+                    nxt = time.perf_counter()
         finally:
-            self.kb.cleanup(); reset_terminal(self.s)
+            self.kb.cleanup()
+            reset_terminal(self.s)
 
     def _events(self) -> bool:
         r = False
         if self.tc_flag.is_set():
-            self._tree_change(); r = True
+            self._tree_change()
+            r = True
         if self.u.redraw_needed.is_set():
-            self.u.redraw_needed.clear(); r = True
-        if self.u.clear_success_if_expired(1.0): r = True
+            self.u.redraw_needed.clear()
+            r = True
+        if self.u.clear_success_if_expired(0.5):
+            r = True
         return r
 
     def _input(self) -> bool:
@@ -90,11 +128,7 @@ class Application:
         if k == curses.KEY_RESIZE:
             self.resized = True
             return False
-        if k != -1 and self.kb.handle_key(k):
-            if self.tc_flag.is_set():
-                self.action_changed = True
-            return True
-        return False
+        return self.kb.handle_key(k)
 
     def _tree_change(self):
         self._rebuild()
@@ -123,6 +157,24 @@ class Application:
                 self.ah.update_context(cur, self.cache)
             self.renderer.render(self.cache, cur, self.tot)
 
-def run_application(stdscr,root_node:TreeNode,path_to_node:Dict[str,TreeNode],fmt:str,path_mode:str,tree_changed_flag:threading.Event,lock:threading.Lock):
-    if hasattr(curses,"update_lines_cols"):curses.update_lines_cols()
-    Application(stdscr,root_node,path_to_node,fmt,path_mode,tree_changed_flag,lock).run()
+def run_application(
+    stdscr,
+    root_node: TreeNode,
+    path_to_node: Dict[str, TreeNode],
+    fmt: str,
+    path_mode: str,
+    tree_changed_flag: threading.Event,
+    lock: threading.Lock,
+
+):
+    if hasattr(curses, "update_lines_cols"):
+        curses.update_lines_cols()
+    Application(
+        stdscr,
+        root_node,
+        path_to_node,
+        fmt,
+        path_mode,
+        tree_changed_flag,
+        lock,
+    ).run()

@@ -46,10 +46,8 @@ class ControlManager:
         add(curses.KEY_ENTER, Event(EventType.ENTER_KEY, "keyboard"))
         add(10, Event(EventType.ENTER_KEY, "keyboard"))
         add(13, Event(EventType.ENTER_KEY, "keyboard"))
-        if hasattr(curses, "KEY_SR"):
-            add(getattr(curses, "KEY_SR"), Event(EventType.NAVIGATION_UP,   "keyboard"))
-        if hasattr(curses, "KEY_SF"):
-            add(getattr(curses, "KEY_SF"), Event(EventType.NAVIGATION_DOWN, "keyboard"))
+        if hasattr(curses, "KEY_SR"): add(getattr(curses, "KEY_SR"), Event(EventType.NAVIGATION_UP,   "keyboard"))
+        if hasattr(curses, "KEY_SF"): add(getattr(curses, "KEY_SF"), Event(EventType.NAVIGATION_DOWN, "keyboard"))
         return m
 
     def register_handler(self, et: EventType, handler: Callable[[Event], bool]):
@@ -57,21 +55,30 @@ class ControlManager:
 
     def _throttled(self, et: EventType) -> bool:
         interval = self.throttle.get(et)
-        if interval is None or interval == 0.0: return False
-        now = time.perf_counter(); last = self.last.get(et, 0.0)
-        if now - last < interval: return True
-        self.last[et] = now; return False
+        if interval is None or interval == 0.0:
+            return False
+        now = time.perf_counter()
+        last = self.last.get(et, 0.0)
+        if now - last < interval:
+            return True
+        self.last[et] = now
+        return False
 
     def handle_event(self, e: Event) -> bool:
         handler = self.event_handlers.get(e.event_type)
-        if handler is None: return False
-        if self._throttled(e.event_type): return False
-        try: return handler(e)
-        except: return False
+        if handler is None:
+            return False
+        if self._throttled(e.event_type):
+            return False
+        try:
+            return handler(e)
+        except:
+            return False
 
     def get_event_from_key(self, k: int) -> Optional[Event]:
         base_event = self._key_map.get(k)
-        if base_event is None: return None
+        if base_event is None:
+            return None
         shift = self.ui_state.physical_shift_pressed
         if base_event.event_type in (EventType.NAVIGATION_UP, EventType.NAVIGATION_DOWN):
             return Event(base_event.event_type, "keyboard", {"shift": shift})
