@@ -33,7 +33,7 @@ def get_refresh_rate() -> float:
     return _env_rate() or _detect_refresh_rate() or 144.0
 
 def get_cli_refresh_interval() -> float:
-    return 1.0 / max(480.0, get_refresh_rate())
+    return 1.0 / max(120.0, get_refresh_rate())
 
 STATE_FILE = os.path.join(
     (os.getenv("APPDATA") or Path.home()) if sys.platform.startswith("win") else (os.getenv("XDG_STATE_HOME") or Path.home() / ".codemap"),
